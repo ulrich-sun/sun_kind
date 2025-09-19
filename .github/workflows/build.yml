@@ -1,0 +1,56 @@
+name: Build and Test Kubernetes Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t kube-docker-image:latest .
+
+      - name: Test Docker image
+        run: |
+          echo "[INFO] Test kubectl"
+          docker run --rm kube-docker-image:latest kubectl version --client
+
+          echo "[INFO] Test minikube"
+          docker run --rm kube-docker-image:latest minikube version
+
+          echo "[INFO] Test crictl"
+          docker run --rm kube-docker-image:latest crictl --version
+
+#   # (Optionnel) Push sur Docker Hub ou GHCR
+#   push-to-registry:
+#     needs: build
+#     runs-on: ubuntu-latest
+#     if: github.ref == 'refs/heads/main'
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Log in to GitHub Container Registry
+#         uses: docker/login-action@v3
+#         with:
+#           registry: ghcr.io
+#           username: ${{ github.actor }}
+#           password: ${{ secrets.GITHUB_TOKEN }}
+
+#       - name: Push image to GHCR
+#         run: |
+#           IMAGE=ghcr.io/${{ github.repository }}/kube-docker-image:latest
+#           docker build -t $IMAGE .
+#           docker push $IMAGE
