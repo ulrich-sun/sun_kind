@@ -2,21 +2,16 @@ FROM ubuntu:22.04
 
 # Installe les dépendances et configure les dépôts
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-transport-https ca-certificates curl gnupg git bash-completion systemctl && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-transport-https ca-certificates curl gnupg git bash-completion lsb-release && \
     mkdir -p -m 755 /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    mkdir -p -m 755 /etc/apt/keyrings \
-    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key \
-    | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg \
-    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /" \
-    > /etc/apt/sources.list.d/kubernetes.list \
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /" > /etc/apt/sources.list.d/kubernetes.list && \
     apt-get update
 
-
-
 # Installe les outils
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io kubelet kubeadm kubectl && \
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io kubelet=1.32.0-00 kubeadm=1.32.0-00 kubectl=1.32.0-00 && \
     apt-mark hold kubelet kubeadm kubectl && \
     curl -Lf -o /usr/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && \
     curl -Lf -o /usr/bin/docker-compose https://github.com/docker/compose/releases/download/1.21.0/docker-compose-$(uname -s)-$(uname -m) && \
