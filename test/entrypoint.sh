@@ -1,6 +1,6 @@
 #!/bin/bash
 
-kubeadm config image pull 
+kubeadm config images pull 
 # mount --make-shared /
 # /usr/local/bin/containerd &
 # sleep 5
