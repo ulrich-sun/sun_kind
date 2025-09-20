@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 # Installe les dépendances et configure les dépôts
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-transport-https ca-certificates curl gnupg git bash-completion lsb-release kmod && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y apt-transport-https ca-certificates curl gnupg git bash-completion lsb-release kmod modprobe && \
     mkdir -p -m 755 /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
@@ -22,6 +22,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli co
 COPY ./systemctl /usr/bin/systemctl
 RUN chmod +x /usr/bin/systemctl
 COPY ./kubelet.env /etc/systemd/system/
+COPY ./kubelet.service /lib/systemd/system/
 COPY ./docker.service /lib/systemd/system/
 COPY ./wrapkubeadm.sh /usr/local/bin/kubeadm
 COPY ./tokens.csv /etc/pki/tokens.csv
@@ -34,7 +35,8 @@ COPY ./motd /etc/motd
 RUN mkdir -p /root/.kube && ln -s /etc/kubernetes/admin.conf /root/.kube/config && \
     echo 'source <(kubectl completion bash)' >>~/.bashrc && \
     kubectl completion bash >> /etc/bash_completion.d/kubectl && \
-    rm -f /etc/machine-id
+    rm -f /etc/machine-id \
+    systemctl daemon-reload
 
 VOLUME ["/var/lib/kubelet"]
 
