@@ -28,6 +28,7 @@ COPY ./daemon.json /etc/docker/
 COPY ./resolv.conf.override /etc/
 COPY ./.bashrc /root/
 COPY ./motd /etc/motd
+RUN chmod +x /usr/bin/systemctl
 
 # Configuration finale
 RUN mkdir -p /root/.kube && ln -s /etc/kubernetes/admin.conf /root/.kube/config && \
