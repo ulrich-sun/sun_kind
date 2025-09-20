@@ -20,9 +20,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli co
 
 # Copie les fichiers de configuration
 COPY ./systemctl /usr/bin/systemctl
-RUN chmod +x /usr/bin/systemctl
 COPY ./kubelet.env /etc/systemd/system/
-COPY ./kubelet.service /lib/systemd/system/
 COPY ./docker.service /lib/systemd/system/
 COPY ./wrapkubeadm.sh /usr/local/bin/kubeadm
 COPY ./tokens.csv /etc/pki/tokens.csv
@@ -30,20 +28,19 @@ COPY ./daemon.json /etc/docker/
 COPY ./resolv.conf.override /etc/
 COPY ./.bashrc /root/
 COPY ./motd /etc/motd
+RUN chmod +x /usr/bin/systemctl
 
 # Configuration finale
 RUN mkdir -p /root/.kube && ln -s /etc/kubernetes/admin.conf /root/.kube/config && \
     echo 'source <(kubectl completion bash)' >>~/.bashrc && \
     kubectl completion bash >> /etc/bash_completion.d/kubectl && \
-    rm -f /etc/machine-id && \
-    systemctl daemon-reload
+    rm -f /etc/machine-id
 
 VOLUME ["/var/lib/kubelet"]
 
 WORKDIR /root
 
 CMD mount --make-shared / && \
-    systemctl start containerd && \
     systemctl start docker && \
     systemctl start kubelet && \
     while true; do script -q -c "/bin/bash -l" /dev/null; done
