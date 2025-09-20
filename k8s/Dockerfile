@@ -44,8 +44,6 @@ VOLUME ["/var/lib/kubelet"]
 
 WORKDIR /root
 
-CMD mount --make-shared / && \
-    systemctl start containerd && \
-    systemctl start docker && \
-    systemctl start kubelet && \
-    while true; do script -q -c "/bin/bash -l" /dev/null; done
+COPY start-all.sh /usr/local/bin/start-all.sh
+RUN chmod +x /usr/local/bin/start-all.sh
+CMD ["/usr/local/bin/start-all.sh"]
