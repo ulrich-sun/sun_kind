@@ -2,8 +2,9 @@ name: Build
 
 on:
   push:
-    branches: [feat/containerized]
-
+    branches:
+      - main
+  pull_request:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
