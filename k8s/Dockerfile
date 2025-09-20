@@ -27,7 +27,7 @@ COPY ./kubelet.service /lib/systemd/system/
 # COPY ./kubelet-containerd.conf /etc/systemd/system/kubelet.service.d/20-containerd.conf
 
 COPY  ./kubelet-config.yaml /etc/kubernetes/kubelet-config.yaml
-COPY  ./Kubelet.conf /etc/kubernetes/kubelet.conf
+COPY  ./kubelet.conf /etc/kubernetes/kubelet.conf
 COPY ./docker.service /lib/systemd/system/
 COPY ./wrapkubeadm.sh /usr/local/bin/kubeadm
 COPY ./tokens.csv /etc/pki/tokens.csv
