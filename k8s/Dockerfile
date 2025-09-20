@@ -23,11 +23,8 @@ COPY ./systemctl /usr/bin/systemctl
 RUN chmod +x /usr/bin/systemctl
 COPY ./kubelet.env /etc/systemd/system/
 COPY ./kubelet.service /lib/systemd/system/
-# # Configure kubelet pour containerd
-# COPY ./kubelet-containerd.conf /etc/systemd/system/kubelet.service.d/20-containerd.conf
-
-COPY  ./kubelet-config.yaml /etc/kubernetes/kubelet-config.yaml
-COPY  ./kubelet.conf /etc/kubernetes/kubelet.conf
+# Configure kubelet pour containerd
+COPY ./kubelet-containerd.conf /etc/systemd/system/kubelet.service.d/20-containerd.conf
 COPY ./docker.service /lib/systemd/system/
 COPY ./wrapkubeadm.sh /usr/local/bin/kubeadm
 COPY ./tokens.csv /etc/pki/tokens.csv
@@ -47,6 +44,8 @@ VOLUME ["/var/lib/kubelet"]
 
 WORKDIR /root
 
-COPY start-all.sh /usr/local/bin/start-all.sh
-RUN chmod +x /usr/local/bin/start-all.sh
-CMD ["/usr/local/bin/start-all.sh"]
+CMD mount --make-shared / && \
+    systemctl start containerd && \
+    systemctl start docker && \
+    systemctl start kubelet && \
+    while true; do script -q -c "/bin/bash -l" /dev/null; done
