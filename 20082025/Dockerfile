@@ -27,7 +27,7 @@ RUN mkdir -p /etc/containerd && \
 COPY kubelet/config.yaml /var/lib/kubelet/config.yaml
 COPY systemd/kubelet.service /etc/systemd/system/kubelet.service
 COPY systemd/10-kubeadm.conf /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-
+RUN echo "root:toor" | chpasswd
 # Entrypoint for systemd
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
