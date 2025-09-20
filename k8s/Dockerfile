@@ -11,7 +11,7 @@ RUN apt-get update && \
     apt-get update
 
 # Installe les outils
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io kubelet=1.32.0-00 kubeadm=1.32.0-00 kubectl=1.32.0-00 && \
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io kubelet kubeadm kubectl && \
     apt-mark hold kubelet kubeadm kubectl && \
     curl -Lf -o /usr/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && \
     curl -Lf -o /usr/bin/docker-compose https://github.com/docker/compose/releases/download/1.21.0/docker-compose-$(uname -s)-$(uname -m) && \
