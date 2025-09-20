@@ -50,7 +50,9 @@ RUN curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | gpg --d
     DEBIAN_FRONTEND=noninteractive apt-get install -y kubelet kubeadm kubectl && \
     apt-mark hold kubelet kubeadm kubectl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-
+# Désactiver swap
+RUN swapoff -a
+RUN sed -i '/ swap / s/^/#/' /etc/fstab
 # Copier les scripts et fichiers de configuration
 COPY ./systemctl /usr/bin/systemctl
 RUN chmod +x /usr/bin/systemctl
@@ -61,8 +63,8 @@ COPY ./wrapkubeadm.sh /usr/local/bin/kubeadm
 COPY ./kubelet-config.yaml /etc/kubernetes/kubelet-config.yaml
 COPY ./kubelet.service /lib/systemd/system/kubelet.service
 COPY ./kubelet.conf /etc/kubernetes/kubelet.conf
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY entrypoint.sh /etc/kubernetes/entrypoint.sh
+RUN chmod +x /etc/kubernetes/entrypoint.sh
 
 
 # Configurer containerd et systemd
@@ -77,7 +79,11 @@ VOLUME ["/var/lib/kubelet"]
 
 WORKDIR /root
 
-# Script de démarrage
-ENTRYPOINT ["/entrypoint.sh"]
+# # Script de démarrage
+# ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["bash"]
+# CMD ["bash"]
+
+
+CMD mount --make-shared / && systemctl start containerd && systemctl start kubelet && /bin/bash /etc/kubernetes/entrypoint.sh \
+    && while true; do bash -l; done
