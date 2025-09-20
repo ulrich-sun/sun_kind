@@ -1,3 +1,5 @@
+#!/bin/bash
+
 mount --make-shared /
 /usr/bin/containerd &
 sleep 5
