@@ -35,7 +35,7 @@ COPY ./motd /etc/motd
 RUN mkdir -p /root/.kube && ln -s /etc/kubernetes/admin.conf /root/.kube/config && \
     echo 'source <(kubectl completion bash)' >>~/.bashrc && \
     kubectl completion bash >> /etc/bash_completion.d/kubectl && \
-    rm -f /etc/machine-id \
+    rm -f /etc/machine-id && \
     systemctl daemon-reload
 
 VOLUME ["/var/lib/kubelet"]
