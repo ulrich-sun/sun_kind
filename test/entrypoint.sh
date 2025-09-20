@@ -1,6 +1,7 @@
 #!/bin/bash
-
 mount --make-shared /
-/usr/bin/containerd &
+/usr/local/bin/containerd &
 sleep 5
-/usr/bin/kubelet --config=/etc/kubernetes/kubelet-config.yaml
+/usr/bin/dockerd &
+sleep 5
+/usr/bin/kubelet --config=/etc/kubernetes/kubelet-config.yaml --kubeconfig=/etc/kubernetes/kubelet.conf

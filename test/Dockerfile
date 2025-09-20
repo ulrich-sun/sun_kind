@@ -24,7 +24,8 @@ RUN apt-get update && \
 
 # Installer containerd
 RUN wget https://github.com/containerd/containerd/releases/download/v2.0.0/containerd-2.0.0-linux-amd64.tar.gz && \
-    tar Cxzvf /usr/local containerd-2.0.0-linux-amd64.tar.gz
+    tar -C /usr/local -xzvf  containerd-2.0.0-linux-amd64.tar.gz && \
+    chmod +x /usr/local/bin/containerd
 
 # Installer runc
 RUN wget https://github.com/opencontainers/runc/releases/download/v1.1.3/runc.amd64 && \
@@ -33,7 +34,7 @@ RUN wget https://github.com/opencontainers/runc/releases/download/v1.1.3/runc.am
 # Installer CNI plugins
 RUN wget https://github.com/containernetworking/plugins/releases/download/v1.1.1/cni-plugins-linux-amd64-v1.1.1.tgz && \
     mkdir -p /opt/cni/bin && \
-    tar Cxzvf /opt/cni/bin cni-plugins-linux-amd64-v1.1.1.tgz
+    tar -C /opt/cni/bin -xzvf cni-plugins-linux-amd64-v1.1.1.tgz
 
 # Installer Docker CLI
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg && \
