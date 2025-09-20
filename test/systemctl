@@ -1,14 +1,11 @@
 #!/bin/bash
 
-UNIT_PATHS=(
-    /etc/systemd/system/
-    /usr/lib/systemd/system/
-)
+UNIT_PATHS=(/etc/systemd/system/ /usr/lib/systemd/system/)
 
 function get_unit_file() {
-    local UNIT="$1"
-    for DIR in "${UNIT_PATHS[@]}"; do
-        if [ -f "${DIR}${UNIT}" ]; then
+    local UNIT=$1
+    for DIR in "${UNIT_PATHS[@]}" ; do
+        if [ -f "${DIR}${UNIT}" ] ; then
             echo "${DIR}${UNIT}"
             return
         fi
@@ -21,41 +18,42 @@ function read_option() {
     local UNIT_INSTANCE="$3"
 
     local UNIT=$(basename "$UNIT_FILE")
-    local UNIT_FULL="${UNIT/@/@$UNIT_INSTANCE}"
+    local UNIT_FULL=$(echo "$UNIT" | sed "s/@/@$UNIT_INSTANCE/")
 
     local VALUE
-    VALUE=$(grep -E "^${OPTION}[= ]" "$UNIT_FILE" | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    VALUE=$(grep -E "^$OPTION[= ]" "$UNIT_FILE" | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
-    VALUE=$(echo "$VALUE" |
-        sed -e "s/%[i]/$UNIT_INSTANCE/g" \
-            -e "s/%[I]/$UNIT_INSTANCE/g" \
-            -e "s/%[n]/$UNIT_FULL/g" \
-            -e "s/%[N]/$UNIT_FULL/g"
-    )
+    VALUE=$(echo "$VALUE" | sed \
+        -e "s/%i/$UNIT_INSTANCE/g" \
+        -e "s/%I/\"$UNIT_INSTANCE\"/g" \
+        -e "s/%n/$UNIT_FULL/g" \
+        -e "s/%N/\"$UNIT_FULL\"/g")
 
     echo "$VALUE"
 }
 
 function get_unit_wants() {
-    local UNIT_FILE="$1"
+    local UNIT_FILE=$1
     local UNIT=$(basename "$UNIT_FILE")
 
     sort -u <<< "$(
-        for DIR in "${UNIT_PATHS[@]}"; do
-            if [ -d "${DIR}${UNIT}.wants" ]; then
+        for DIR in "${UNIT_PATHS[@]}" ; do
+            if [ -d "${DIR}${UNIT}.wants" ] ; then
                 ls -1 "${DIR}${UNIT}.wants/" | tr '\n' ' '
             fi
         done
+
         read_option Wants "$UNIT_FILE"
     )"
 }
 
 function action_start() {
-    local UNIT_FILE="$1"
-    local UNIT_INSTANCE="$2"
+    local UNIT_FILE=$1
+    local UNIT_INSTANCE=$2
 
     local UNIT_WANTS=($(get_unit_wants "$UNIT_FILE"))
 
+    # Start dependent services
     for UNIT in "${UNIT_WANTS[@]}"; do
         exec_action start "$UNIT"
     done
@@ -68,146 +66,139 @@ function action_start() {
     local ExecStartPost=($(read_option ExecStartPost "$UNIT_FILE" "$UNIT_INSTANCE"))
     local Restart=$(read_option Restart "$UNIT_FILE" "$UNIT_INSTANCE")
     local RestartSec=$(read_option RestartSec "$UNIT_FILE" "$UNIT_INSTANCE")
-    RestartSec=${RestartSec:-5}
+    RestartSec=${RestartSec:=5}
 
     [ -f "$EnvironmentFile" ] && source "$EnvironmentFile"
 
-    local COMMAND=""
-    if [ -z "$Type" ] || [[ "${Type,,}" == *"simple"* ]]; then
-        if [[ "$Restart" == "always" ]]; then
-            COMMAND="nohup bash -c 'while true; do $ExecStart; sleep $RestartSec; done' &>/dev/null &"
-        else
-            COMMAND="nohup $ExecStart &>/dev/null &"
-        fi
-    elif [[ "${Type,,}" == *"forking"* ]] || [[ "${Type,,}" == *"oneshot"* ]]; then
-        COMMAND="$ExecStart"
-    else
-        >&2 echo "Unknown service type $Type"
-    fi
+    # Handle service types
+    case "${Type,,}" in
+        ""|"simple"|"notify"|"dbus"|"idle")
+            if [ "$Restart" == "always" ]; then
+                COMMAND="nohup bash -c 'while true; do $ExecStart; sleep $RestartSec; done' &>/dev/null &"
+            else
+                COMMAND="nohup $ExecStart >>/dev/null 2>&1 &"
+            fi
+            ;;
+        "forking"|"oneshot")
+            COMMAND="$ExecStart"
+            ;;
+        *)
+            >&2 echo "Unknown service type $Type"
+            return 1
+            ;;
+    esac
 
-    for cmd in "${ExecStartPre[@]}"; do
-        eval "$cmd"
+    # Execute pre-start
+    for CMD in "${ExecStartPre[@]}"; do
+        eval "$CMD"
     done
 
     eval "$COMMAND"
 
-    for cmd in "${ExecStartPost[@]}"; do
-        eval "$cmd"
+    # Execute post-start
+    for CMD in "${ExecStartPost[@]}"; do
+        eval "$CMD"
     done
 }
 
 function action_stop() {
-    local UNIT_FILE="$1"
-    local UNIT_INSTANCE="$2"
+    local UNIT_FILE=$1
+    local UNIT_INSTANCE=$2
 
     local UNIT_WANTS=($(get_unit_wants "$UNIT_FILE"))
 
+    for UNIT in "${UNIT_WANTS[@]}"; do
+        exec_action stop "$UNIT"
+    done
+
+    local User=$(read_option User "$UNIT_FILE" "$UNIT_INSTANCE")
+    local Type=$(read_option Type "$UNIT_FILE" "$UNIT_INSTANCE")
+    local EnvironmentFile=$(read_option EnvironmentFile "$UNIT_FILE" "$UNIT_INSTANCE")
     local ExecStopPre=($(read_option ExecStopPre "$UNIT_FILE" "$UNIT_INSTANCE"))
     local ExecStop=$(read_option ExecStop "$UNIT_FILE" "$UNIT_INSTANCE")
     local ExecStopPost=($(read_option ExecStopPost "$UNIT_FILE" "$UNIT_INSTANCE"))
     local ExecStart=$(read_option ExecStart "$UNIT_FILE" "$UNIT_INSTANCE")
 
-    local EnvironmentFile=$(read_option EnvironmentFile "$UNIT_FILE" "$UNIT_INSTANCE")
     [ -f "$EnvironmentFile" ] && source "$EnvironmentFile"
 
-    local COMMAND=""
-    if [ -z "$ExecStop" ]; then
-        COMMAND="kill -TERM \$(pgrep -f \"$ExecStart\")"
-    else
-        COMMAND="$ExecStop"
-    fi
+    COMMAND=${ExecStop:-"kill -TERM \$(pgrep -f \"$ExecStart\")"}
 
-    for cmd in "${ExecStopPre[@]}"; do
-        eval "$cmd"
+    for CMD in "${ExecStopPre[@]}"; do
+        eval "$CMD"
     done
 
     eval "$COMMAND"
 
-    for cmd in "${ExecStopPost[@]}"; do
-        eval "$cmd"
+    for CMD in "${ExecStopPost[@]}"; do
+        eval "$CMD"
     done
 }
 
 function action_restart() {
-    local UNIT_FILE="$1"
-    local UNIT_INSTANCE="$2"
+    local UNIT_FILE=$1
+    local UNIT_INSTANCE=$2
     action_stop "$UNIT_FILE" "$UNIT_INSTANCE"
     action_start "$UNIT_FILE" "$UNIT_INSTANCE"
 }
 
-function action_enable() {
-    local UNIT_FILE="$1"
-    local UNIT=$(basename "$UNIT_FILE")
-    local UNIT_INSTANCE="$2"
-    local UNIT_FULL="${UNIT/@/@$UNIT_INSTANCE}"
-
-    local WantedBy=$(read_option WantedBy "$UNIT_FILE")
-    if [ -z "$WantedBy" ]; then
-        >&2 echo "Unit $UNIT has no WantedBy option."
-        exit 1
-    fi
-
-    local WANTEDBY_DIR="/etc/systemd/system/$WantedBy.wants"
-    mkdir -p "$WANTEDBY_DIR"
-    [ ! -f "$WANTEDBY_DIR/$UNIT_FULL" ] && ln -s "$UNIT_FILE" "$WANTEDBY_DIR/$UNIT_FULL"
-}
-
-function action_disable() {
-    local UNIT_FILE="$1"
-    local UNIT=$(basename "$UNIT_FILE")
-    local UNIT_INSTANCE="$2"
-    local UNIT_FULL="${UNIT/@/@$UNIT_INSTANCE}"
-
-    local WantedBy=$(read_option WantedBy "$UNIT_FILE")
-    [ -z "$WantedBy" ] && { >&2 echo "Unit $UNIT has no WantedBy option."; exit 1; }
-
-    local WANTEDBY_DIR="/etc/systemd/system/$WantedBy.wants"
-    [ -f "$WANTEDBY_DIR/$UNIT_FULL" ] && rm -f "$WANTEDBY_DIR/$UNIT_FULL"
-}
-
 function action_status() {
-    local UNIT_FILE="$1"
-    local UNIT_INSTANCE="$2"
-
+    local UNIT_FILE=$1
+    local UNIT_INSTANCE=$2
     local ExecStart=$(read_option ExecStart "$UNIT_FILE" "$UNIT_INSTANCE")
+
     if pgrep -f "$ExecStart" &>/dev/null; then
+        echo "active"
         exit 0
     else
-        >&2 echo "Loaded: not-found"
+        >&2 echo "inactive"
         exit 1
     fi
+}
+
+function action_enable() {
+    local UNIT_FILE=$1
+    local UNIT_NAME=$(basename "$UNIT_FILE")
+
+    TARGET_DIR="/etc/systemd/system/multi-user.target.wants"
+    mkdir -p "$TARGET_DIR"
+    ln -sf "$UNIT_FILE" "$TARGET_DIR/$UNIT_NAME"
+    echo "Enabled $UNIT_NAME"
 }
 
 function exec_action() {
-    local ACTION="$1"
-    local UNIT="$2"
-    
-    [[ "$UNIT" =~ \. ]] || UNIT="$UNIT.service"
+    local ACTION=$1
+    local UNIT=$2
+
+    [[ $UNIT =~ '.' ]] || UNIT="$UNIT.service"
 
     local UNIT_INSTANCE=""
-    if [[ "$UNIT" =~ '@' ]]; then
-        UNIT_INSTANCE="${UNIT#*@}"
-        UNIT="${UNIT%@*}"
+    if [[ $UNIT =~ '@' ]] ; then
+        UNIT_INSTANCE=$(echo "$UNIT" | cut -d'@' -f2- | cut -d. -f1)
+        UNIT=$(echo "$UNIT" | sed "s/@$UNIT_INSTANCE//")
     fi
 
-    local UNIT_FILE
-    UNIT_FILE=$(get_unit_file "$UNIT")
-    [ -z "$UNIT_FILE" ] && { >&2 echo "Failed to $ACTION $UNIT: Unit $UNIT not found."; exit 1; }
+    local UNIT_FILE=$(get_unit_file "$UNIT")
 
-    case "$ACTION" in
-        start)      action_start "$UNIT_FILE" "$UNIT_INSTANCE" ;;
-        stop)       action_stop "$UNIT_FILE" "$UNIT_INSTANCE" ;;
-        restart)    action_restart "$UNIT_FILE" "$UNIT_INSTANCE" ;;
-        enable)     action_enable "$UNIT_FILE" "$UNIT_INSTANCE" ;;
-        disable)    action_disable "$UNIT_FILE" "$UNIT_INSTANCE" ;;
-        status)     action_status "$UNIT_FILE" "$UNIT_INSTANCE" ;;
-        *)          >&2 echo "Unknown operation $ACTION."; exit 1 ;;
-    esac
+    if [ -z "$UNIT_FILE" ]; then
+        >&2 echo "Failed to $ACTION $UNIT: Unit $UNIT not found."
+        exit 1
+    else
+        case "$ACTION" in
+            start)      action_start "$UNIT_FILE" "$UNIT_INSTANCE" ;;
+            stop)       action_stop "$UNIT_FILE" "$UNIT_INSTANCE" ;;
+            restart)    action_restart "$UNIT_FILE" "$UNIT_INSTANCE" ;;
+            status)     action_status "$UNIT_FILE" "$UNIT_INSTANCE" ;;
+            enable)     action_enable "$UNIT_FILE" ;;
+            *) >&2 echo "Unknown operation $ACTION." ; exit 1 ;;
+        esac
+    fi
 }
 
-# Main execution
+# Main
 ACTION="$1"
 shift
-for UNIT in "$@"; do
+UNITS=("$@")
+
+for UNIT in "${UNITS[@]}"; do
     exec_action "$ACTION" "$UNIT"
 done
